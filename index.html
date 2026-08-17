@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Realistic Moon & Cosmic Night Sky</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Montserrat:wght@200;300;500&display=swap" rel="stylesheet">
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #02040a;
+      font-family: 'Montserrat', sans-serif;
+      color: #ffffff;
+    }
+
+    #webgl-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+      display: block;
+      cursor: default;
+    }
+
+    /* Content Overlay */
+    .hero-container {
+      position: absolute;
+      top: 50%;
+      left: 8%;
+      transform: translateY(-50%);
+      z-index: 10;
+      max-width: 650px;
+      pointer-events: none;
+    }
+
+    .tagline {
+      font-size: 0.75rem;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: rgba(210, 230, 255, 0.7);
+      margin-bottom: 1.2rem;
+      font-weight: 300;
+    }
+
+    .title {
+      font-family: 'Cinzel', serif;
+      font-size: 2.8rem;
+      font-weight: 400;
+      line-height: 1.2;
+      letter-spacing: 0.15em;
+      color: #ffffff;
+      text-shadow: 0 0 25px rgba(180, 220, 255, 0.5);
+      margin-bottom: 1.5rem;
+      text-transform: uppercase;
+    }
+
+    .description {
+      font-size: 0.8rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: rgba(180, 205, 240, 0.6);
+      margin-bottom: 2.5rem;
+    }
+
+    .footer-quote {
+      font-size: 0.7rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: rgba(160, 190, 230, 0.45);
+    }
+
+    .hint-drag {
+      position: absolute;
+      bottom: 25px;
+      right: 30px;
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.3);
+      z-index: 10;
+      pointer-events: none;
+    }
+  </style>
+
+  <!-- Three.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+  <!-- WebGL Scene -->
+  <canvas id="webgl-canvas"></canvas>
+
+  <!-- Hero Typography Overlay -->
+  <div class="hero-container">
+    <div class="tagline">That's exactly how I love you</div>
+    <h1 class="title">Just like the moon lights<br>up the night</h1>
+    <div class="description">Bright, gentle, and endless</div>
+    <div class="footer-quote">You and you are my heart falling, forever</div>
+  </div>
+
+  <div class="hint-drag">✦ Drag the moon to move it</div>
+
+  <script>
+    // --- Scene Setup ---
+    const canvas = document.getElementById('webgl-canvas');
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x02040a, 0.001);
+
+    const camera = new THREE.PerspectiveCamera(
+      45,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      1000
+    );
+    camera.position.set(0, 4, 42);
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas: canvas,
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+
+    // --- Procedural High-Res Lunar Texture Generator ---
+    function generateMoonTextures() {
+      const size = 2048;
+      const canvasColor = document.createElement('canvas');
+      canvasColor.width = size;
+      canvasColor.height = size;
+      const ctx = canvasColor.getContext('2d');
+
+      const canvasBump = document.createElement('canvas');
+      canvasBump.width = size;
+      canvasBump.height = size;
+      const bumpCtx = canvasBump.getContext('2d');
+
+      // Base tone
+      ctx.fillStyle = '#9e9e9e';
+      ctx.fillRect(0, 0, size, size);
+      bumpCtx.fillStyle = '#808080';
+      bumpCtx.fillRect(0, 0, size, size);
+
+      // Procedural lunar maria (Dark Basalt Plains)
+      const mariaCount = 28;
+      for (let i = 0; i < mariaCount; i++) {
+        const x = Math.random() * size;
+        const y = Math.random() * size;
+        const r = Math.random() * 260 + 80;
+        
+        const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+        grad.addColorStop(0, 'rgba(40, 45, 52, 0.85)');
+        grad.addColorStop(0.5, 'rgba(60, 65, 75, 0.5)');
+        grad.addColorStop(1, 'rgba(150, 150, 150, 0)');
+
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Depress bump in maria
+        const bGrad = bumpCtx.createRadialGradient(x, y, 0, x, y, r);
+        bGrad.addColorStop(0, 'rgba(30, 30, 30, 0.6)');
+        bGrad.addColorStop(1, 'rgba(128, 128, 128, 0)');
+        bumpCtx.fillStyle = bGrad;
+        bumpCtx.beginPath();
+        bumpCtx.arc(x, y, r, 0, Math.PI * 2);
+        bumpCtx.fill();
+      }
+
+      // Procedural Impact Craters with Bright Ejecta Rays
+      const craterCount = 550;
+      for (let i = 0; i < craterCount; i++) {
+        const x = Math.random() * size;
+        const y = Math.random() * size;
+        const r = Math.pow(Math.random(), 3) * 60 + 3;
+
+        // Bright rim
+        const grad = ctx.createRadialGradient(x, y, r * 0.4, x, y, r);
+        grad.addColorStop(0, 'rgba(40, 40, 40, 0.9)');
+        grad.addColorStop(0.75, 'rgba(110, 110, 110, 0.95)');
+        grad.addColorStop(0.9, 'rgba(235, 235, 245, 0.9)');
+        grad.addColorStop(1, 'rgba(150, 150, 150, 0)');
+
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Bump rim & floor
+        const bGrad = bumpCtx.createRadialGradient(x, y, r * 0.5, x, y, r);
+        bGrad.addColorStop(0, 'rgba(0, 0, 0, 1)');
+        bGrad.addColorStop(0.85, 'rgba(255, 255, 255, 1)');
+        bGrad.addColorStop(1, 'rgba(128, 128, 128, 0)');
+        bumpCtx.fillStyle = bGrad;
+        bumpCtx.beginPath();
+        bumpCtx.arc(x, y, r, 0, Math.PI * 2);
+        bumpCtx.fill();
+      }
+
+      // High-frequency surface micro-noise
+      const imgData = ctx.getImageData(0, 0, size, size);
+      const bData = bumpCtx.getImageData(0, 0, size, size);
+      for (let i = 0; i < imgData.data.length; i += 4) {
+        const noise = (Math.random() - 0.5) * 22;
+        imgData.data[i] += noise;
+        imgData.data[i+1] += noise;
+        imgData.data[i+2] += noise;
+
+        bData.data[i] += noise * 1.5;
+        bData.data[i+1] += noise * 1.5;
+        bData.data[i+2] += noise * 1.5;
+      }
+      ctx.putImageData(imgData, 0, 0);
+      bumpCtx.putImageData(bData, 0, 0);
+
+      const colorTexture = new THREE.CanvasTexture(canvasColor);
+      const bumpTexture = new THREE.CanvasTexture(canvasBump);
+      return { colorTexture, bumpTexture };
+    }
+
+    const { colorTexture, bumpTexture } = generateMoonTextures();
+
+    // Particle Texture Generator
+    function createGlowParticle() {
+      const size = 64;
+      const c = document.createElement('canvas');
+      c.width = size;
+      c.height = size;
+      const ctx = c.getContext('2d');
+      const g = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+      g.addColorStop(0.0, 'rgba(255, 255, 255, 1)');
+      g.addColorStop(0.2, 'rgba(200, 230, 255, 0.8)');
+      g.addColorStop(0.5, 'rgba(90, 150, 255, 0.25)');
+      g.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, size, size);
+      return new THREE.CanvasTexture(c);
+    }
+    const particleTex = createGlowParticle();
+
+    // --- 1. Realistic 3D Moon Group & Shaders ---
+    const moonGroup = new THREE.Group();
+    moonGroup.position.set(13, 4.5, 0);
+    scene.add(moonGroup);
+
+    // Moon Sphere Mesh
+    const moonGeo = new THREE.SphereGeometry(4.2, 64, 64);
+    const moonMat = new THREE.MeshStandardMaterial({
+      map: colorTexture,
+      bumpMap: bumpTexture,
+      bumpScale: 0.12,
+      roughness: 0.92,
+      metalness: 0.05,
+      color: 0xefefff
+    });
+
+    const moonMesh = new THREE.Mesh(moonGeo, moonMat);
+    moonGroup.add(moonMesh);
+
+    // Moon Atmospheric Glow (Fresnel Limb Effect)
+    const atmosphereMat = new THREE.ShaderMaterial({
+      vertexShader: `
+        varying vec3 vNormal;
+        void main() {
+          vNormal = normalize(normalMatrix * normal);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vNormal;
+        void main() {
+          float intensity = pow(0.65 - dot(vNormal, vec3(0, 0, 1.0)), 3.0);
+          gl_FragColor = vec4(0.7, 0.85, 1.0, 1.0) * intensity * 0.9;
+        }
+      `,
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+      transparent: true
+    });
+    const atmosphereMesh = new THREE.Mesh(new THREE.SphereGeometry(4.5, 32, 32), atmosphereMat);
+    moonGroup.add(atmosphereMesh);
+
+    // Soft Radial Moon Halo
+    const haloMat = new THREE.SpriteMaterial({
+      map: particleTex,
+      color: 0x88bbff,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      opacity: 0.55
+    });
+    const moonHalo = new THREE.Sprite(haloMat);
+    moonHalo.scale.set(30, 30, 1);
+    moonGroup.add(moonHalo);
+
+    // --- 2. Lighting Rig for Realistic Lunar Phase ---
+    // Key Sun Light (Angle forms a beautiful natural crescent)
+    const sunLight = new THREE.DirectionalLight(0xffffff, 2.8);
+    sunLight.position.set(22, 14, 18);
+    scene.add(sunLight);
+
+    // Soft Earthshine / Nightside Ambient
+    const earthshineLight = new THREE.DirectionalLight(0x1a2b4a, 0.45);
+    earthshineLight.position.set(-20, -10, 10);
+    scene.add(earthshineLight);
+
+    const spaceAmbient = new THREE.AmbientLight(0x060c18, 0.8);
+    scene.add(spaceAmbient);
+
+    // --- 3. Background Cosmic Particles & Stars ---
+    const bgStarsCount = 2200;
+    const bgStarsGeo = new THREE.BufferGeometry();
+    const bgStarsPos = new Float32Array(bgStarsCount * 3);
+    for (let i = 0; i < bgStarsCount * 3; i += 3) {
+      bgStarsPos[i] = (Math.random() - 0.5) * 320;
+      bgStarsPos[i + 1] = Math.random() * 140 - 30;
+      bgStarsPos[i + 2] = (Math.random() - 0.5) * 220 - 40;
+    }
+    bgStarsGeo.setAttribute('position', new THREE.BufferAttribute(bgStarsPos, 3));
+    const bgStars = new THREE.Points(bgStarsGeo, new THREE.PointsMaterial({
+      size: 0.9,
+      map: particleTex,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      color: 0xaaccff
+    }));
+    scene.add(bgStars);
+
+    // Custom Twinkling Star Dust
+    const dustCount = 4500;
+    const dustGeo = new THREE.BufferGeometry();
+    const dustPos = new Float32Array(dustCount * 3);
+    const dustScales = new Float32Array(dustCount);
+    const dustRandoms = new Float32Array(dustCount);
+
+    for (let i = 0; i < dustCount; i++) {
+      dustPos[i * 3] = (Math.random() - 0.5) * 85;
+      dustPos[i * 3 + 1] = (Math.random() - 0.5) * 28 + Math.sin(dustPos[i * 3] * 0.04) * 4;
+      dustPos[i * 3 + 2] = (Math.random() - 0.5) * 60;
+      dustScales[i] = Math.random() * 18.0 + 4.0;
+      dustRandoms[i] = Math.random() * 100.0;
+    }
+
+    dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+    dustGeo.setAttribute('aScale', new THREE.BufferAttribute(dustScales, 1));
+    dustGeo.setAttribute('aRandom', new THREE.BufferAttribute(dustRandoms, 1));
+
+    const dustMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0.0 },
+        uTexture: { value: particleTex }
+      },
+      vertexShader: `
+        uniform float uTime;
+        attribute float aScale;
+        attribute float aRandom;
+        varying float vAlpha;
+
+        void main() {
+          vec3 pos = position;
+          pos.y += sin(uTime * 0.7 + aRandom) * 0.35;
+          pos.x += cos(uTime * 0.4 + aRandom) * 0.25;
+
+          vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+          gl_Position = projectionMatrix * mvPosition;
+          gl_PointSize = aScale * (28.0 / -mvPosition.z);
+          vAlpha = 0.35 + 0.65 * sin(uTime * 2.2 + aRandom);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D uTexture;
+        varying float vAlpha;
+
+        void main() {
+          vec4 tex = texture2D(uTexture, gl_PointCoord);
+          vec3 col = mix(vec3(0.5, 0.75, 1.0), vec3(0.95, 0.98, 1.0), vAlpha);
+          gl_FragColor = vec4(col, tex.a * vAlpha * 0.8);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const starDust = new THREE.Points(dustGeo, dustMaterial);
+    scene.add(starDust);
+
+    // --- 4. Interactive Drag & Move Controls for the Moon ---
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    const dragPlane = new THREE.Plane();
+    const planeIntersect = new THREE.Vector3();
+    const dragOffset = new THREE.Vector3();
+
+    let isDragging = false;
+    let targetMoonPos = new THREE.Vector3().copy(moonGroup.position);
+    let targetRotationX = 0;
+    let targetRotationY = 0;
+
+    // Camera parallax targets
+    let targetMouseX = 0;
+    let targetMouseY = 0;
+    let currentMouseX = 0;
+    let currentMouseY = 0;
+
+    function getNormalizedCoords(e) {
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return {
+        x: (clientX / window.innerWidth) * 2 - 1,
+        y: -(clientY / window.innerHeight) * 2 + 1
+      };
+    }
+
+    function onPointerDown(e) {
+      const coords = getNormalizedCoords(e);
+      mouse.x = coords.x;
+      mouse.y = coords.y;
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObject(moonMesh);
+
+      if (intersects.length > 0) {
+        isDragging = true;
+        canvas.style.cursor = 'grabbing';
+
+        // Plane aligned with camera facing the moon's current depth
+        dragPlane.setFromNormalAndCoplanarPoint(
+          camera.getWorldDirection(new THREE.Vector3()).negate(),
+          moonGroup.position
+        );
+
+        if (raycaster.ray.intersectPlane(dragPlane, planeIntersect)) {
+          dragOffset.copy(planeIntersect).sub(moonGroup.position);
+        }
+      }
+    }
+
+    function onPointerMove(e) {
+      const coords = getNormalizedCoords(e);
+      mouse.x = coords.x;
+      mouse.y = coords.y;
+
+      if (!isDragging) {
+        // Parallax updates
+        targetMouseX = mouse.x;
+        targetMouseY = mouse.y;
+
+        // Hover test for cursor
+        raycaster.setFromCamera(mouse, camera);
+        const hits = raycaster.intersectObject(moonMesh);
+        canvas.style.cursor = hits.length > 0 ? 'grab' : 'default';
+      } else {
+        // Drag position calculations
+        raycaster.setFromCamera(mouse, camera);
+        if (raycaster.ray.intersectPlane(dragPlane, planeIntersect)) {
+          targetMoonPos.copy(planeIntersect.sub(dragOffset));
+          
+          // Constrain within visible field
+          targetMoonPos.x = Math.max(-25, Math.min(25, targetMoonPos.x));
+          targetMoonPos.y = Math.max(-14, Math.min(18, targetMoonPos.y));
+        }
+      }
+    }
+
+    function onPointerUp() {
+      if (isDragging) {
+        isDragging = false;
+        canvas.style.cursor = 'grab';
+      }
+    }
+
+    window.addEventListener('mousedown', onPointerDown);
+    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mouseup', onPointerUp);
+
+    window.addEventListener('touchstart', onPointerDown, { passive: true });
+    window.addEventListener('touchmove', onPointerMove, { passive: true });
+    window.addEventListener('touchend', onPointerUp);
+
+    // --- Resize Handler ---
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    // --- Animation Loop ---
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const elapsedTime = clock.getElapsedTime();
+      dustMaterial.uniforms.uTime.value = elapsedTime;
+
+      // Smooth Moon Position Lerping
+      moonGroup.position.lerp(targetMoonPos, 0.08);
+
+      // Subtle Axial Rotation for realistic sphere immersion
+      moonMesh.rotation.y += 0.0008;
+      moonMesh.rotation.x = Math.sin(elapsedTime * 0.2) * 0.04;
+
+      // Smooth Parallax Camera
+      currentMouseX += (targetMouseX - currentMouseX) * 0.04;
+      currentMouseY += (targetMouseY - currentMouseY) * 0.04;
+
+      camera.position.x = currentMouseX * 3.5;
+      camera.position.y = 4 + (-currentMouseY * 2.5);
+      camera.lookAt(0, 2, 0);
+
+      // Background slow cosmic rotation
+      bgStars.rotation.y = elapsedTime * 0.005;
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>
